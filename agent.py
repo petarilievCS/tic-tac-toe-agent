@@ -9,14 +9,21 @@ import sys
 import numpy as np
 
 # a board cell can hold:
-#   0 - Empty
-#   1 - We played here
-#   2 - Opponent played here
+EMPTY = 0
+PLAYER = 1
+OPPONENT = 2
 
 # the boards are of size 10 because index 0 isn't used
 boards = np.zeros((10, 10), dtype="int8")
 s = [".","X","O"]
 curr = 0 # this is the current board to play in
+
+m = 1
+move = np.zeros(82,dtype=np.int32)
+best_move = np.zeros(82,dtype=np.int32)
+
+MIN_EVAL = -1000000
+MAX_EVAL =  1000000
 
 # print a row
 def print_board_row(bd, a, b, c, i, j, k):
@@ -38,6 +45,38 @@ def print_board(board):
     print_board_row(board, 7,8,9,4,5,6)
     print_board_row(board, 7,8,9,7,8,9)
     print()
+
+def alphabeta(player, m, bd, alpha, beta, best_move):
+
+    opponent = OPPONENT if player == PLAYER else PLAYER
+    # Terminal nodes
+    # TODO: Only search previous board? 
+    if game_won(player): # Win
+        return 1000 - m
+    elif game_won(opponent): # Loss
+        return 1000 + m 
+    
+    # Run alphabeta on each possible move
+    this_move = 0
+    best_eval = MIN_EVAL
+    for r in range(1, 10):
+        if boards[bd][r] == EMPTY:
+            this_move = r
+            boards[bd][r] = player # make move
+            this_eval = -alphabeta(opponent, m + 1, r, -beta, -alpha, best_move)
+            boards[bd][r] = EMPTY # undo move
+            if this_eval > best_eval:
+                best_move[m] = this_move
+                best_eval = this_eval
+                if best_eval > alpha:
+                    alpha = best_eval
+                    if alpha >= beta:
+                        return alpha
+
+    if this_move == 0: # Draw
+        return(0)
+    return(alpha)
+
 
 # choose a move to play
 def play():
@@ -61,6 +100,8 @@ def place( board, num, player ):
 # read what the server sent us and
 # parse only the strings that are necessary
 def parse(string):
+    global m, move, best_move
+
     if "(" in string:
         command, args = string.split("(")
         args = args.split(")")[0]
@@ -79,7 +120,8 @@ def parse(string):
     if command == "second_move":
         # place the first move (randomly generated for opponent)
         place(int(args[0]), int(args[1]), 2)
-        return play()  # choose and return the second move
+        move[m] = int(args[1])
+        m += 1
 
     # third_move(K,L,M) means that the first and second move were
     # in square L of sub-board K, and square M of sub-board L,
@@ -89,7 +131,11 @@ def parse(string):
         place(int(args[0]), int(args[1]), 1)
         # place the second move (chosen by opponent)
         place(curr, int(args[2]), 2)
-        return play() # choose and return the third move
+
+        move[m] = int(args[1])
+        m += 1
+        move[m] = int(args[2])
+        m += 1
 
     # nex_move(M) means that the previous move was into
     # square M of the designated sub-board,
@@ -97,7 +143,6 @@ def parse(string):
     elif command == "next_move":
         # place the previous move (chosen by opponent)
         place(curr, int(args[0]), 2)
-        return play() # choose and return our next move
 
     elif command == "win":
         print("Yay!! We win!! :)")
@@ -107,7 +152,27 @@ def parse(string):
         print("We lost :(")
         return -1
 
-    return 0
+    alphabeta(PLAYER, m, curr, MIN_EVAL, MAX_EVAL, best_move)
+    move[m] = best_move[m]
+    m += 1
+    return move[m]
+
+#**********************************************************
+#   Return True if game won by player p on board bd[]
+#
+def game_won(p, bd):
+    result = True
+
+    for bd in boards:
+        result = result and (  ( bd[1] == p and bd[2] == p and bd[3] == p )
+                            or( bd[4] == p and bd[5] == p and bd[6] == p )
+                            or( bd[7] == p and bd[8] == p and bd[9] == p )
+                            or( bd[1] == p and bd[4] == p and bd[7] == p )
+                            or( bd[2] == p and bd[5] == p and bd[8] == p )
+                            or( bd[3] == p and bd[6] == p and bd[9] == p )
+                            or( bd[1] == p and bd[5] == p and bd[9] == p )
+                            or( bd[3] == p and bd[5] == p and bd[7] == p ))
+    return result
 
 # connect to socket
 def main():

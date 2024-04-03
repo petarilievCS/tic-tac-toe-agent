@@ -21,17 +21,17 @@ MIN_EVAL = -1000000
 MAX_EVAL =  1000000
 
 def main():
-    board = EMPTY*np.ones(10,dtype=np.int32)
-    move = np.zeros(10,dtype=np.int32)
-    best_move = np.zeros(10,dtype=np.int32)
-    is_human = (True,False)
+    board = EMPTY*np.ones(10,dtype=np.int32) # Array of 2s
+    move = np.zeros(10,dtype=np.int32) # Array of 0s
+    best_move = np.zeros(10,dtype=np.int32) # Array of 0s
+    is_human = (True, False)  
     game_status = STILL_PLAYING
     player = 1
     m = 0
 
     while m < MAX_MOVE and game_status == STILL_PLAYING:
         m += 1
-        player = 1-player;
+        player = 1-player
         if is_human[player]:
             print_board( board )
             move[m] = input('Enter move [1-9]: ')
@@ -39,7 +39,7 @@ def main():
                 move[m] = input('Enter move [1-9]: ')
         else:
             alphabeta( player,m,board,MIN_EVAL,MAX_EVAL,best_move )
-            move[m] = best_move[m];
+            move[m] = best_move[m]
         game_status = make_move( player, m, move, board )
 
     print_board( board )
@@ -58,12 +58,12 @@ def print_board( bd ):
 #
 def alphabeta( player, m, board, alpha, beta, best_move ):
 
-    best_eval = MIN_EVAL;
+    best_eval = MIN_EVAL
 
     if game_won( 1-player, board ):   # LOSS
-        return -1000 + m; # better to win faster (or lose slower)
+        return -1000 + m # better to win faster (or lose slower)
 
-    this_move = 0;
+    this_move = 0
     for r in range( 1, 10):
         if board[r] == EMPTY:         # move is legal
             this_move = r
@@ -71,7 +71,7 @@ def alphabeta( player, m, board, alpha, beta, best_move ):
             this_eval = -alphabeta(1-player,m+1,board,-beta,-alpha,best_move)
             board[this_move] = EMPTY; # undo move
             if this_eval > best_eval:
-                best_move[m] = this_move;
+                best_move[m] = this_move
                 best_eval = this_eval
                 if best_eval > alpha:
                     alpha = best_eval
