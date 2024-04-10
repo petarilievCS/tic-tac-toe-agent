@@ -25,6 +25,12 @@ best_move = np.zeros(82,dtype=np.int32)
 MIN_EVAL = -1000000
 MAX_EVAL =  1000000
 
+WIN_EVAL = 1000
+LOSS_EVAL = -1000
+DRAW_EVAL = 0
+
+DEPTH_LIMIT = 1
+
 # print a row
 def print_board_row(bd, a, b, c, i, j, k):
     print(" "+s[bd[a][i]]+" "+s[bd[a][j]]+" "+s[bd[a][k]]+" | " \
@@ -46,15 +52,21 @@ def print_board(board):
     print_board_row(board, 7,8,9,7,8,9)
     print()
 
-def alphabeta(player, m, bd, alpha, beta, best_move):
+def alphabeta(player, m, bd, alpha, beta, best_move, depth):
 
     opponent = OPPONENT if player == PLAYER else PLAYER
+
     # Terminal nodes
-    # TODO: Only search previous board? 
-    if game_won(player): # Win
-        return 1000 - m
-    elif game_won(opponent): # Loss
-        return 1000 + m 
+    # if game_won(player):
+    #     return WIN_EVAL
+    if game_won(opponent):
+        return LOSS_EVAL
+    if board_full(bd):
+        return DRAW_EVAL
+    
+    # Max depth reached
+    if depth == DEPTH_LIMIT:
+        return evaluate_game(player, bd)
     
     # Run alphabeta on each possible move
     this_move = 0
@@ -63,7 +75,7 @@ def alphabeta(player, m, bd, alpha, beta, best_move):
         if boards[bd][r] == EMPTY:
             this_move = r
             boards[bd][r] = player # make move
-            this_eval = -alphabeta(opponent, m + 1, r, -beta, -alpha, best_move)
+            this_eval = -alphabeta(opponent, m + 1, r, -beta, -alpha, best_move, depth + 1)
             boards[bd][r] = EMPTY # undo move
             if this_eval > best_eval:
                 best_move[m] = this_move
@@ -73,10 +85,7 @@ def alphabeta(player, m, bd, alpha, beta, best_move):
                     if alpha >= beta:
                         return alpha
 
-    if this_move == 0: # Draw
-        return(0)
-    return(alpha)
-
+    return alpha
 
 # choose a move to play
 def play():
@@ -113,6 +122,8 @@ def parse(string):
     # start(x) or start(o) tell us whether we will be playing first (x)
     # or second (o); we might be able to ignore start if we internally
     # use 'X' for *our* moves and 'O' for *opponent* moves.
+    if command == "init." or command == "start" or len(command) == 0:
+        return 0
 
     # second_move(K,L) means that the (randomly generated)
     # first move was into square L of sub-board K,
@@ -150,29 +161,149 @@ def parse(string):
 
     elif command == "loss":
         print("We lost :(")
+        print(move)
         return -1
 
-    alphabeta(PLAYER, m, curr, MIN_EVAL, MAX_EVAL, best_move)
+    alphabeta(PLAYER, m, curr, MIN_EVAL, MAX_EVAL, best_move, 0)
     move[m] = best_move[m]
     m += 1
-    return move[m]
+    place(curr, move[m - 1], 1)
+    return move[m - 1]
 
 #**********************************************************
 #   Return True if game won by player p on board bd[]
 #
-def game_won(p, bd):
-    result = True
-
+def game_won(p):
     for bd in boards:
-        result = result and (  ( bd[1] == p and bd[2] == p and bd[3] == p )
-                            or( bd[4] == p and bd[5] == p and bd[6] == p )
-                            or( bd[7] == p and bd[8] == p and bd[9] == p )
-                            or( bd[1] == p and bd[4] == p and bd[7] == p )
-                            or( bd[2] == p and bd[5] == p and bd[8] == p )
-                            or( bd[3] == p and bd[6] == p and bd[9] == p )
-                            or( bd[1] == p and bd[5] == p and bd[9] == p )
-                            or( bd[3] == p and bd[5] == p and bd[7] == p ))
-    return result
+        if (   ( bd[1] == p and bd[2] == p and bd[3] == p )
+            or ( bd[4] == p and bd[5] == p and bd[6] == p )
+            or ( bd[7] == p and bd[8] == p and bd[9] == p )
+            or ( bd[1] == p and bd[4] == p and bd[7] == p )
+            or ( bd[2] == p and bd[5] == p and bd[8] == p )
+            or ( bd[3] == p and bd[6] == p and bd[9] == p )
+            or ( bd[1] == p and bd[5] == p and bd[9] == p )
+            or ( bd[3] == p and bd[5] == p and bd[7] == p )):
+                return True
+    return False
+
+#**********************************************************
+#   Return True if board bd[] is full
+#
+def board_full(bd):
+    board = boards[bd]
+    for i in range(1,10):
+        if board[i] == EMPTY:
+            return False
+    return True
+
+#**********************************************************
+#   Return heurisitc of board bd[] for player p when asked to make a move on sub-board n
+#
+def evaluate_game(p, bd):
+    o = OPPONENT if p == PLAYER else PLAYER # opponent of p
+    result = 0
+
+    p1 = 0 # number of lines with 1 player piece
+    p2 = 0 # number of lines with 2 player pieces
+    o1 = 0 # number of lines with 1 opponent piece
+    o2 = 0 # number of lines with 2 opponent pieces
+
+    p1Rows, p2Rows, o1Rows, o2Rows = check_rows(p, o, bd)
+    p1Columns, p2Columns, o1Columns, o2Columns = check_columns(p, o, bd)
+    p1Diagonals, p2Diagonals, o1Diagonals, o2Diagonals = check_diagonals(p, o, bd)
+
+    p1 = p1Rows + p1Columns + p1Diagonals
+    p2 = p2Rows + p2Columns + p2Diagonals
+    o1 = o1Rows + o1Columns + o1Diagonals
+    o2 = o2Rows + o2Columns + o2Diagonals
+
+    result = p1 + 3*p2 - o1 - 3*o2 # Forumla used to evaluate current state
+        
+    return result 
+
+#**********************************************************
+#   Return number of rows with 1 player piece, 2 player pieces, 1 opponent piece, 2 opponent pieces
+#
+def check_rows(p, o, bd):
+    p1, p2, o1, o2 = 0, 0, 0, 0
+    for r in range(0,3):
+        pCount, oCount = 0, 0
+        for c in range(1,4):
+            if boards[bd][r*3 + c] == p:
+                pCount += 1
+            elif boards[bd][r*3 + c] == o:
+                oCount += 1
+
+        if pCount == 1 and oCount == 0:
+            p1 += 1
+        elif pCount == 2 and oCount == 0:
+            p2 += 1
+        
+        if oCount == 1 and pCount == 0:
+            o1 += 1
+        elif oCount == 2 and pCount == 0:
+            o2 += 1
+    return p1, p2, o1, o2
+
+#**********************************************************
+#   Return number of columns with 1 player piece, 2 player pieces, 1 opponent piece, 2 opponent pieces
+#
+def check_columns(p, o, bd):
+    p1, p2, o1, o2 = 0, 0, 0, 0
+    for c in range(1,4):
+        pCount, oCount = 0, 0
+        for r in range(0,3):
+            if boards[bd][r*3 + c] == p:
+                pCount += 1
+            elif boards[bd][r*3 + c] == o:
+                oCount += 1
+        
+        if pCount == 1 and oCount == 0:
+            p1 += 1
+        elif pCount == 2 and oCount == 0:
+            p2 += 1
+        if oCount == 1 and pCount == 0:
+            o1 += 1
+        elif oCount == 2 and pCount == 0:
+            o2 += 1
+    return p1, p2, o1, o2
+
+#**********************************************************
+#   Return number of diagonals with 1 player piece, 2 player pieces, 1 opponent piece, 2 opponent pieces
+#
+def check_diagonals(p, o, bd):
+    p1, p2, o1, o2 = 0, 0, 0, 0
+    pCount, oCount = 0, 0
+    for i in range(0,3):
+        if boards[bd][i*4 + 1] == p:
+            pCount += 1
+        elif boards[bd][i*4 + 1] == o:
+            oCount += 1
+    if pCount == 1 and oCount == 0:
+        p1 += 1
+    elif pCount == 2 and oCount == 0:
+        p2 += 1
+    if oCount == 1 and pCount == 0:
+        o1 += 1
+    elif oCount == 2 and pCount == 0:
+        o2 += 1
+
+    pCount, oCount = 0, 0
+    for i in range(3,8,2):
+        if boards[bd][i] == p:
+            pCount += 1
+        elif boards[bd][i] == o:
+            oCount += 1
+
+    if pCount == 1 and oCount == 0:
+        p1 += 1
+    elif pCount == 2 and oCount == 0:
+        p2 += 1
+    if oCount == 1 and pCount == 0:
+        o1 += 1
+    elif oCount == 2 and pCount == 0:
+        o2 += 1
+    return p1, p2, o1, o2
 
 # connect to socket
 def main():
@@ -186,7 +317,9 @@ def main():
             continue
         for line in text.split("\n"):
             response = parse(line)
-            if response == -1:
+            if response == 0: 
+                continue
+            elif response == -1:
                 s.close()
                 return
             elif response > 0:
