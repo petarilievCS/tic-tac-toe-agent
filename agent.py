@@ -29,7 +29,7 @@ WIN_EVAL = 1000
 LOSS_EVAL = -1000
 DRAW_EVAL = 0
 
-DEPTH_LIMIT = 1
+DEPTH_LIMIT = 6
 
 # print a row
 def print_board_row(bd, a, b, c, i, j, k):
@@ -52,31 +52,31 @@ def print_board(board):
     print_board_row(board, 7,8,9,7,8,9)
     print()
 
-def alphabeta(player, m, bd, alpha, beta, best_move, depth):
+def alphabeta(player, m, curr, prev, alpha, beta, best_move, depth):
 
     opponent = OPPONENT if player == PLAYER else PLAYER
 
     # Terminal nodes
     # if game_won(player):
     #     return WIN_EVAL
-    if game_won(opponent):
+    if game_won(opponent, prev):
         return LOSS_EVAL
-    if board_full(bd):
+    if board_full(curr):
         return DRAW_EVAL
     
     # Max depth reached
     if depth == DEPTH_LIMIT:
-        return evaluate_game(player, bd)
+        return evaluate_game(player, curr)
     
     # Run alphabeta on each possible move
     this_move = 0
     best_eval = MIN_EVAL
     for r in range(1, 10):
-        if boards[bd][r] == EMPTY:
+        if boards[curr][r] == EMPTY:
             this_move = r
-            boards[bd][r] = player # make move
-            this_eval = -alphabeta(opponent, m + 1, r, -beta, -alpha, best_move, depth + 1)
-            boards[bd][r] = EMPTY # undo move
+            boards[curr][r] = player # make move
+            this_eval = -alphabeta(opponent, m + 1, r, curr, -beta, -alpha, best_move, depth + 1)
+            boards[curr][r] = EMPTY # undo move
             if this_eval > best_eval:
                 best_move[m] = this_move
                 best_eval = this_eval
@@ -110,6 +110,7 @@ def place( board, num, player ):
 # parse only the strings that are necessary
 def parse(string):
     global m, move, best_move
+    prev = curr
 
     if "(" in string:
         command, args = string.split("(")
@@ -164,26 +165,26 @@ def parse(string):
         print(move)
         return -1
 
-    alphabeta(PLAYER, m, curr, MIN_EVAL, MAX_EVAL, best_move, 0)
+    alphabeta(PLAYER, m, curr, prev, MIN_EVAL, MAX_EVAL, best_move, 0)
     move[m] = best_move[m]
     m += 1
     place(curr, move[m - 1], 1)
     return move[m - 1]
 
 #**********************************************************
-#   Return True if game won by player p on board bd[]
+#   Return True if game won by player p on board prev_board
 #
-def game_won(p):
-    for bd in boards:
-        if (   ( bd[1] == p and bd[2] == p and bd[3] == p )
-            or ( bd[4] == p and bd[5] == p and bd[6] == p )
-            or ( bd[7] == p and bd[8] == p and bd[9] == p )
-            or ( bd[1] == p and bd[4] == p and bd[7] == p )
-            or ( bd[2] == p and bd[5] == p and bd[8] == p )
-            or ( bd[3] == p and bd[6] == p and bd[9] == p )
-            or ( bd[1] == p and bd[5] == p and bd[9] == p )
-            or ( bd[3] == p and bd[5] == p and bd[7] == p )):
-                return True
+def game_won(p, prev_board):
+    bd = boards[prev_board]
+    if (   ( bd[1] == p and bd[2] == p and bd[3] == p )
+        or ( bd[4] == p and bd[5] == p and bd[6] == p )
+        or ( bd[7] == p and bd[8] == p and bd[9] == p )
+        or ( bd[1] == p and bd[4] == p and bd[7] == p )
+        or ( bd[2] == p and bd[5] == p and bd[8] == p )
+        or ( bd[3] == p and bd[6] == p and bd[9] == p )
+        or ( bd[1] == p and bd[5] == p and bd[9] == p )
+        or ( bd[3] == p and bd[5] == p and bd[7] == p )):
+            return True
     return False
 
 #**********************************************************
@@ -199,7 +200,9 @@ def board_full(bd):
 #**********************************************************
 #   Return heurisitc of board bd[] for player p when asked to make a move on sub-board n
 #
-def evaluate_game(p, bd):
+def evaluate_game(p, current_board):
+    FACTOR_TWO = 50
+    FACTOR_CURRENT = 2
     o = OPPONENT if p == PLAYER else PLAYER # opponent of p
     result = 0
 
@@ -208,17 +211,35 @@ def evaluate_game(p, bd):
     o1 = 0 # number of lines with 1 opponent piece
     o2 = 0 # number of lines with 2 opponent pieces
 
-    p1Rows, p2Rows, o1Rows, o2Rows = check_rows(p, o, bd)
-    p1Columns, p2Columns, o1Columns, o2Columns = check_columns(p, o, bd)
-    p1Diagonals, p2Diagonals, o1Diagonals, o2Diagonals = check_diagonals(p, o, bd)
+    for board in range(1, 10):
+        p1Rows, p2Rows, o1Rows, o2Rows = check_rows(p, o, board)
+        p1Columns, p2Columns, o1Columns, o2Columns = check_columns(p, o, board)
+        p1Diagonals, p2Diagonals, o1Diagonals, o2Diagonals = check_diagonals(p, o, board)
 
-    p1 = p1Rows + p1Columns + p1Diagonals
-    p2 = p2Rows + p2Columns + p2Diagonals
-    o1 = o1Rows + o1Columns + o1Diagonals
-    o2 = o2Rows + o2Columns + o2Diagonals
+        # Weight current board more
+        if board == current_board:
+            p1Rows *= FACTOR_CURRENT
+            p2Rows *= FACTOR_CURRENT
+            o1Rows *= FACTOR_CURRENT
+            o2Rows *= FACTOR_CURRENT
 
-    result = p1 + 3*p2 - o1 - 3*o2 # Forumla used to evaluate current state
-        
+            p1Columns *= FACTOR_CURRENT
+            p2Columns *= FACTOR_CURRENT
+            o1Columns *= FACTOR_CURRENT
+            o2Columns *= FACTOR_CURRENT
+
+            p1Diagonals *= FACTOR_CURRENT
+            p2Diagonals *= FACTOR_CURRENT
+            o1Diagonals *= FACTOR_CURRENT
+            o2Diagonals *= FACTOR_CURRENT
+
+        p1 += p1Rows + p1Columns + p1Diagonals
+        p2 += p2Rows + p2Columns + p2Diagonals
+        o1 += o1Rows + o1Columns + o1Diagonals
+        o2 += o2Rows + o2Columns + o2Diagonals
+
+    result = p1 + FACTOR_TWO * p2 - o1 - FACTOR_TWO * o2 # Forumla used to evaluate current state
+         
     return result 
 
 #**********************************************************
