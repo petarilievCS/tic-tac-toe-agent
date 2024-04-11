@@ -13,6 +13,15 @@ EMPTY = 0
 PLAYER = 1
 OPPONENT = 2
 
+MIN_EVAL = -1000000
+MAX_EVAL =  1000000
+
+WIN_EVAL = 1000
+LOSS_EVAL = -1000
+DRAW_EVAL = 0
+
+INITIAL_DEPTH_LIMIT = 6
+
 # the boards are of size 10 because index 0 isn't used
 boards = np.zeros((10, 10), dtype="int8")
 s = [".","X","O"]
@@ -21,15 +30,7 @@ curr = 0 # this is the current board to play in
 m = 1
 move = np.zeros(82,dtype=np.int32)
 best_move = np.zeros(82,dtype=np.int32)
-
-MIN_EVAL = -1000000
-MAX_EVAL =  1000000
-
-WIN_EVAL = 1000
-LOSS_EVAL = -1000
-DRAW_EVAL = 0
-
-DEPTH_LIMIT = 6
+depth_limit = INITIAL_DEPTH_LIMIT
 
 # print a row
 def print_board_row(bd, a, b, c, i, j, k):
@@ -65,7 +66,7 @@ def alphabeta(player, m, curr, prev, alpha, beta, best_move, depth):
         return DRAW_EVAL
     
     # Max depth reached
-    if depth == DEPTH_LIMIT:
+    if depth == depth_limit:
         return evaluate_game(player, curr)
     
     # Run alphabeta on each possible move
@@ -162,7 +163,6 @@ def parse(string):
 
     elif command == "loss":
         print("We lost :(")
-        print(move)
         return -1
 
     alphabeta(PLAYER, m, curr, prev, MIN_EVAL, MAX_EVAL, best_move, 0)
@@ -328,12 +328,18 @@ def check_diagonals(p, o, bd):
 
 # connect to socket
 def main():
+    global depth_limit
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     port = int(sys.argv[2]) # Usage: ./agent.py -p (port)
 
     s.connect(('localhost', port))
     while True:
         text = s.recv(1024).decode()
+
+        # Increase depth limit towards the end of the game
+        if m == 15 or m == 30:
+            depth_limit += 1
+
         if not text:
             continue
         for line in text.split("\n"):
