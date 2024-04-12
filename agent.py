@@ -28,11 +28,12 @@ INITIAL_DEPTH_LIMIT = 6
 boards = np.zeros((10, 10), dtype="int8")
 s = [".","X","O"]
 curr = 0 # this is the current board to play in
+transposition_table = {}
+depth_limit = INITIAL_DEPTH_LIMIT
 
 m = 1
 move = np.zeros(82,dtype=np.int32)
 best_move = np.zeros(82,dtype=np.int32)
-depth_limit = INITIAL_DEPTH_LIMIT
 
 # print a row
 def print_board_row(bd, a, b, c, i, j, k):
@@ -56,20 +57,29 @@ def print_board(board):
     print()
 
 def alphabeta(player, m, curr, prev, alpha, beta, best_move, depth):
-
+    global transposition_table
     opponent = OPPONENT if player == PLAYER else PLAYER
+
+    hash_code = get_board_hash_string()
+    if (hash_code, depth) in transposition_table:
+        return transposition_table[(hash_code, depth)]
 
     # Terminal nodes
     if game_won(player, prev):
         return WIN_EVAL
     if game_won(opponent, prev):
+        transposition_table[(hash_code, depth)] = LOSS_EVAL
         return LOSS_EVAL
+        
     if board_full(curr):
+        transposition_table[(hash_code, depth)] = DRAW_EVAL
         return DRAW_EVAL
     
     # Max depth reached
     if depth == depth_limit:
-        return evaluate_game(player, curr)
+        heuristic = evaluate_game(player, curr)
+        transposition_table[(hash_code, depth)] = heuristic
+        return heuristic
     
     # Run alphabeta on each possible move
     this_move = 0
@@ -86,8 +96,10 @@ def alphabeta(player, m, curr, prev, alpha, beta, best_move, depth):
                 if best_eval > alpha:
                     alpha = best_eval
                     if alpha >= beta:
+                        transposition_table[(hash_code, depth)] = alpha
                         return alpha
 
+    transposition_table[(hash_code, depth)] = alpha
     return alpha
 
 # choose a move to play
@@ -326,6 +338,12 @@ def check_diagonals(p, o, bd):
     elif oCount == 2 and pCount == 0:
         o2 += 1
     return p1, p2, o1, o2
+
+#**********************************************************
+#   Return hash string of the current board
+#
+def get_board_hash_string():
+    return str(boards[1:10].flatten())
 
 # connect to socket
 def main():
