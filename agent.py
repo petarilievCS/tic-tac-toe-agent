@@ -16,9 +16,11 @@ OPPONENT = 2
 MIN_EVAL = -1000000
 MAX_EVAL =  1000000
 
-WIN_EVAL = 1000
-LOSS_EVAL = -1000
+WIN_EVAL = 10000
+LOSS_EVAL = -10000
 DRAW_EVAL = 0
+FACTOR_TWO = 50
+FACTOR_CURRENT = 2
 
 INITIAL_DEPTH_LIMIT = 6
 
@@ -58,8 +60,8 @@ def alphabeta(player, m, curr, prev, alpha, beta, best_move, depth):
     opponent = OPPONENT if player == PLAYER else PLAYER
 
     # Terminal nodes
-    # if game_won(player):
-    #     return WIN_EVAL
+    if game_won(player, prev):
+        return WIN_EVAL
     if game_won(opponent, prev):
         return LOSS_EVAL
     if board_full(curr):
@@ -201,8 +203,7 @@ def board_full(bd):
 #   Return heurisitc of board bd[] for player p when asked to make a move on sub-board n
 #
 def evaluate_game(p, current_board):
-    FACTOR_TWO = 50
-    FACTOR_CURRENT = 2
+
     o = OPPONENT if p == PLAYER else PLAYER # opponent of p
     result = 0
 
@@ -337,7 +338,7 @@ def main():
         text = s.recv(1024).decode()
 
         # Increase depth limit towards the end of the game
-        if m == 15 or m == 30:
+        if m == 20:
             depth_limit += 1
 
         if not text:
