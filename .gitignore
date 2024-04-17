@@ -38,3 +38,21 @@ secrets.txt
 /docs/
 
 # Ignore any other files or directories specific to your project
+
+# C Files
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo

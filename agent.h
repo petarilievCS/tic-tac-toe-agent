@@ -7,6 +7,15 @@
 extern int   port;
 extern char *host;
 
+#define MAX_MOVE 81
+
+typedef struct {
+    int p1;
+    int p2;
+    int o1;
+    int o2;
+} CountValues;
+
  //  parse command-line arguments
 void agent_parse_args( int argc, char *argv[] );
 
@@ -30,3 +39,10 @@ void agent_gameover( int result, int cause );
  //  called at the end of the series of games
 void agent_cleanup();
 
+CountValues count_rows(int bd, int player);
+
+CountValues count_columns(int bd, int player);
+
+CountValues count_diagonals(int bd, int player);
+
+int alphabeta(int player, int m, int cur, int prev, int alpha, int beta, int depth);

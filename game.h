@@ -9,3 +9,4 @@ int   full_board( int bb[] );
 void print_board( FILE *fp,int board[10][10],
 		  int board_num,int prev_move );
 int make_move(int player,int m,int move[],int board[10][10]);
+int gamewon( int p, int bb[10] );
