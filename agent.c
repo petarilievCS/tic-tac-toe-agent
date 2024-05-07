@@ -13,27 +13,19 @@
 #include "agent.h"
 #include "game.h"
 
-#define FALSE          0
-#define TRUE           1
-#define WIN            2
-#define LOSS           3
-#define DRAW           4
+#define MAX_MOVE 81
+#define MAX_EVAL     1000000
+#define MIN_EVAL    -1000000
 
-#define MIN_EVAL -1000000
-#define MAX_EVAL  1000000
-
-// Parameters
-#define FACTOR_TWO 50
-#define FACTOR_CURRENT 2
-#define INITIAL_DEPTH_LIMIT 9
-#define LOSS_EVAL -10000
-#define WIN_EVAL 10000
 
 int board[10][10];
 int move[MAX_MOVE+1];
 int best_move[MAX_MOVE+1];
 int player;
 int m;
+int DEPTH = 10;
+
+// We are player 0 (X) and the other player is 1 (O)
 
 /*********************************************************
    Print usage information and exit
@@ -106,8 +98,10 @@ int agent_second_move( int board_num, int prev_move )
   move[1] = prev_move;
   board[board_num][prev_move] = !player;
   m = 2;
-  alphabeta(player, m, prev_move, 0, MIN_EVAL, MAX_EVAL, 0);
-  this_move = best_move[m];
+  do {
+    alphabeta(player, m, board, prev_move, MIN_EVAL, MAX_EVAL, best_move, DEPTH);
+    this_move = best_move[m];
+  } while( board[prev_move][this_move] != EMPTY );
   move[m] = this_move;
   board[prev_move][this_move] = player;
   return( this_move );
@@ -129,8 +123,10 @@ int agent_third_move(
   board[board_num][first_move] =  player;
   board[first_move][prev_move] = !player;
   m=3;
-  alphabeta(player, m, first_move, prev_move, MIN_EVAL, MAX_EVAL, 0);
-  this_move = best_move[m];
+  do {
+    alphabeta(player, m, board, prev_move, MIN_EVAL, MAX_EVAL, best_move, DEPTH);
+    this_move = best_move[m];
+  } while( board[prev_move][this_move] != EMPTY );
   move[m] = this_move;
   board[move[m-1]][this_move] = player;
   return( this_move );
@@ -141,13 +137,30 @@ int agent_third_move(
 */
 int agent_next_move( int prev_move )
 {
+  if (m == 15){
+    DEPTH = 12;
+  }
+  if (m == 25){
+    DEPTH = 13;
+  }
+  if (m == 29){
+    DEPTH = 16;
+  }
+  if (m == 33){
+    DEPTH = 17;
+  }
+  printf("m = %d\n", m);
+  printf("DEPTH = %d\n", DEPTH);
   int this_move;
   m++;
   move[m] = prev_move;
   board[move[m-1]][move[m]] = !player;
   m++;
-  alphabeta(player, m, move[m - 1], move[m - 2], MIN_EVAL, MAX_EVAL, 0);
-  this_move = best_move[m];
+  do {
+    alphabeta(player, m, board, prev_move, MIN_EVAL, MAX_EVAL, best_move, DEPTH);
+    this_move = best_move[m];
+  } while( board[prev_move][this_move] != EMPTY );
+  move[m] = this_move;
   board[move[m-1]][this_move] = player;
   return( this_move );
 }
@@ -181,253 +194,96 @@ void agent_cleanup()
   // nothing to do here
 }
 
-/*********************************************************
-   Heuristic function - returns a value for the board
-*/
-int evaluate_game(int player, int current_board) {
-
-  int result = 0;
-  int p1 = 0; // number of 1 in a row
-  int p2 = 0; // number of 2 in a row
-  int o1 = 0; // number of 1 in a row
-  int o2 = 0; // number of 2 in a row
-
-  for (int subboard = 1; subboard < 10; subboard++) {
-
-    CountValues rowCounts = count_rows(subboard, player);
-    CountValues columnCounts = count_columns(subboard, player);
-    CountValues diagonalCounts = count_diagonals(subboard, player);
-    
-    int p1Rows = rowCounts.p1;
-    int p2Rows = rowCounts.p2;
-    int o1Rows = rowCounts.o1;
-    int o2Rows = rowCounts.o2;
-
-    int p1Columns = columnCounts.p1;
-    int p2Columns = columnCounts.p2;
-    int o1Columns = columnCounts.o1;
-    int o2Columns = columnCounts.o2;
-
-    int p1Diagonals = diagonalCounts.p1;
-    int p2Diagonals = diagonalCounts.p2;
-    int o1Diagonals = diagonalCounts.o1;
-    int o2Diagonals = diagonalCounts.o2;
-
-    // Increase weight of current_board
-    if (subboard == current_board) {
-      p1Rows *= FACTOR_CURRENT;
-      p2Rows *= FACTOR_CURRENT;
-      o1Rows *= FACTOR_CURRENT;
-      o2Rows *= FACTOR_CURRENT;
-
-      p1Columns *= FACTOR_CURRENT;
-      p2Columns *= FACTOR_CURRENT;
-      o1Columns *= FACTOR_CURRENT;
-      o2Columns *= FACTOR_CURRENT;
-
-      p1Diagonals *= FACTOR_CURRENT;
-      p2Diagonals *= FACTOR_CURRENT;
-      o1Diagonals *= FACTOR_CURRENT;
-      o2Diagonals *= FACTOR_CURRENT;
-    }
-
-    p1 += p1Rows + p1Columns + p1Diagonals;
-    p2 += p2Rows + p2Columns + p2Diagonals;
-    o1 += o1Rows + o1Columns + o1Diagonals;
-    o2 += o2Rows + o2Columns + o2Diagonals;
-    
-  }
-  
-  result = p1 + p2 * FACTOR_TWO - o1 - o2 * FACTOR_TWO;
-  return result;
-
-}
-
-/*********************************************************
-   Return the number of rows with 1 player piece, 2 player pieces, 1 opponent piece, and 2 opponent pieces
-*/
-CountValues count_rows(int bd, int player) {
-  int p1 = 0; // number of 1 in a row
-  int p2 = 0; // number of 2 in a row
-  int o1 = 0; // number of 1 in a row
-  int o2 = 0; // number of 2 in a row
-  
-  for (int r = 0; r < 3; r++) {
-    int pCount = 0;
-    int oCount = 0;
-
-    // Check row
-    for (int c = 1; c < 4; c++) {
-      int piece = board[bd][r * 3 + c];
-      if (piece == player) {
-        pCount++;
-      } else if (piece == !player) {
-        oCount++;
-      }
-    }
-
-    // Update counts
-    if (pCount == 1 && oCount == 0) {
-      p1++;
-    } else if (pCount == 2 && oCount == 0) {
-      p2++;
-    } else if (pCount == 0 && oCount == 1) {
-      o1++;
-    } else if (pCount == 0 && oCount == 2) {
-      o2++;
-    }
-  }
-  
-  CountValues result = {p1, p2, o1, o2};
-  return result;
-}
-
-
-/*********************************************************
-   Return the number of columns with 1 player piece, 2 player pieces, 1 opponent piece, and 2 opponent pieces
-*/
-CountValues count_columns(int bd, int player) {
-  int p1 = 0; // number of 1 in a row
-  int p2 = 0; // number of 2 in a row
-  int o1 = 0; // number of 1 in a row
-  int o2 = 0; // number of 2 in a row
-  
-  for (int c = 1; c < 4; c++) {
-    int pCount = 0;
-    int oCount = 0;
-
-    // Check column
-    for (int r = 0; r < 3; r++) {
-      int piece = board[bd][r * 3 + c];
-      if (piece == player) {
-        pCount++;
-      } else if (piece == !player) {
-        oCount++;
-      }
-    }
-
-    // Update counts
-    if (pCount == 1 && oCount == 0) {
-      p1++;
-    } else if (pCount == 2 && oCount == 0) {
-      p2++;
-    } else if (pCount == 0 && oCount == 1) {
-      o1++;
-    } else if (pCount == 0 && oCount == 2) {
-      o2++;
-    }
-  }
-  
-  CountValues result = {p1, p2, o1, o2};
-  return result;
-}
-
-/*********************************************************
-   Return the number of diagonals with 1 player piece, 2 player pieces, 1 opponent piece, and 2 opponent pieces
-*/
-CountValues count_diagonals(int bd, int player) {
-  int p1 = 0; // number of 1 in a row
-  int p2 = 0; // number of 2 in a row
-  int o1 = 0; // number of 1 in a row
-  int o2 = 0; // number of 2 in a row
-  
-  int pCount = 0;
-  int oCount = 0;
-
-  // Check diagonal 1
-  for (int i = 0; i < 3; i++) {
-    int piece = board[bd][i * 4 + 1];
-    if (piece == player) {
-      pCount++;
-    } else if (piece == !player) {
-      oCount++;
-    }
-  }
-
-  // Update counts
-  if (pCount == 1 && oCount == 0) {
-    p1++;
-  } else if (pCount == 2 && oCount == 0) {
-    p2++;
-  } else if (pCount == 0 && oCount == 1) {
-    o1++;
-  } else if (pCount == 0 && oCount == 2) {
-    o2++;
-  }
-
-  pCount = 0;
-  oCount = 0;
-
-  // Check diagonal 2
-  for (int i = 3; i < 8; i += 2) {
-    int piece = board[bd][i];
-    if (piece == player) {
-      pCount++;
-    } else if (piece == !player) {
-      oCount++;
-    }
-  }
-
-  // Update counts
-  if (pCount == 1 && oCount == 0) {
-    p1++;
-  } else if (pCount == 2 && oCount == 0) {
-    p2++;
-  } else if (pCount == 0 && oCount == 1) {
-    o1++;
-  } else if (pCount == 0 && oCount == 2) {
-    o2++;
-  }
-  
-  CountValues result = {p1, p2, o1, o2};
-  return result;
-}
-
-/*********************************************************
-   Minimax algorithm with alpha-beta pruning
-*/
-int alphabeta(int p, int m, int curr, int prev, int alpha, int beta, int depth) {
-  // Loss
-  if (gamewon(!p, board[prev])) {
-    return LOSS_EVAL;
-  }
-
-  // Win
-  // if (gamewon(player, board[prev])) {
-  //   return WIN_EVAL;
-  // }
-
-  // Draw
-  if (full_board(board[curr])) {
-    return 0;
-  }
-
-  // Max depth reached
-  if (depth == INITIAL_DEPTH_LIMIT) {
-    int res = evaluate_game(p, curr);
-    return res;
-  }
-
+int alphabeta(
+                int player,
+                int m,
+                int board[10][10],
+                int previous_move,
+                int alpha,
+                int beta,
+                int best_move[82],
+                int depth
+               )
+{
   int this_eval;
   int best_eval = MIN_EVAL;
+  int this_move;
+  int r;
+  int i;
+  for (i = 1; i <= 9; i++){
+    if( gamewon( 1-player, board[i] )) { // LOSS
+      return -1000 + m; // better to win faster (or lose slower)
+    }
+  }
 
-  for (int i = 1; i < 10; i++) {
-    if (board[curr][i] == EMPTY) {
-      board[curr][i] = p;
-      this_eval = -alphabeta(!p, m + 1, i, curr, -beta, -alpha, depth + 1);
-      board[curr][i] = EMPTY;
+  if (depth == 0){
+    return evaluate_board(player, board);
+  }
 
-      if (this_eval > best_eval) {
+  this_move = 0;
+  for( r = 1; r <= 9; r++ ) {
+    if( board[previous_move][r] == EMPTY ) {        // move is legal
+      this_move = r;
+      board[previous_move][this_move] = player;     // make move
+      this_eval = -alphabeta(1-player,m+1,board,this_move, -beta,-alpha, best_move, depth-1);
+      board[previous_move][this_move] = EMPTY;      // undo move
+      if( this_eval > best_eval ) {
+        best_move[m] = this_move;
         best_eval = this_eval;
-        best_move[m] = i;
-        if (best_eval > alpha) {
+        if( best_eval > alpha ) {
           alpha = best_eval;
-          if (alpha >= beta) {
-            return alpha;
+          if( alpha >= beta ) {      // cutoff
+            return( alpha );
           }
         }
       }
     }
   }
-  return alpha;
+  if( this_move == 0 ) { // no legal moves
+    return( 0 );         // DRAW
+  }
+  else {
+    return( alpha );
+  }
+}
+
+int evaluate_board(int player, int bds[10][10]) {
+    int heuristic_value = 0;
+    int X1, X2, O1, O2;
+    
+    for (int i = 1; i < 10; i++) {
+        count_symbols(bds[i], &X1, &X2, &O1, &O2);
+        if (player == 0) {
+            heuristic_value += (50 * X2 + X1 - (50 * O2 + O1));
+        } else {
+            heuristic_value += (50 * O2 + O1 - (50 * X2 + X1));
+        }
+    }
+    return heuristic_value;
+}
+
+void count_symbols(int bd[10], int *X1, int *X2, int *O1, int *O2) {
+    int potential_lines[8][3] = {{1,2,3}, {4,5,6}, {7,8,9}, {1,4,7}, {2,5,8}, {3,6,9}, {1,5,9}, {3,5,7}};
+    *X1 = *X2 = *O1 = *O2 = 0;
+    
+    for (int i = 0; i < 8; i++) {
+        int X_count = 0, O_count = 0;
+        for (int j = 0; j < 3; j++) {
+            if (bd[potential_lines[i][j]] == 0) {
+                X_count++;
+            } else if (bd[potential_lines[i][j]] == 1) {
+                O_count++;
+            }
+        }
+        if (X_count == 1 && O_count == 0) {
+            (*X1)++;
+        } else if (X_count == 2 && O_count == 0) {
+            (*X2)++;
+        }
+        if (O_count == 1 && X_count == 0) {
+            (*O1)++;
+        } else if (O_count == 2 && X_count == 0) {
+            (*O2)++;
+        }
+    }
 }
